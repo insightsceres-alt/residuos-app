@@ -204,16 +204,45 @@ def seed_database():
         # ========================================
         print("\n📊 Generando registros de 12 meses...")
         
-        # Tipologías con sus códigos LER
+        # Tipologías con sus códigos LER (formato 6 dígitos sin espacios)
         tipologias = [
-            ("Residuos orgánicos de producción", "02 01 03"),
-            ("Plásticos de envases agrícolas", "15 01 02"),
-            ("Residuos de poda y jardinería", "02 01 07"),
-            ("Envases de papel y cartón", "15 01 01"),
-            ("Residuos metálicos", "15 01 04"),
-            ("Aceites usados de maquinaria", "13 02 05"),
-            ("Residuos de construcción", "17 01 07"),
-            ("Vidrio de envases", "15 01 07"),
+            # Grupo 02 - Residuos agricultura
+            ("Lodos de lavado y limpieza", "020101"),
+            ("Residuos de tejidos de vegetales", "020103"),
+            ("Residuos de plásticos agrícolas", "020104"),
+            ("Heces de animales, orina y estiércol", "020106"),
+            ("Residuos de la silvicultura", "020107"),
+            ("Residuos agroquímicos peligrosos", "020108"),
+            ("Residuos agroquímicos no peligrosos", "020109"),
+            ("Residuos metálicos agrícolas", "020110"),
+            # Grupo 03 - Residuos madera
+            ("Residuos de corteza y corcho", "030101"),
+            ("Serrín y virutas de madera", "030105"),
+            # Grupo 13 - Aceites
+            ("Aceites minerales de motor no clorados", "130205"),
+            ("Aceites sintéticos de motor", "130206"),
+            ("Otros aceites de motor y transmisión", "130208"),
+            # Grupo 15 - Envases
+            ("Envases de papel y cartón", "150101"),
+            ("Envases de plástico", "150102"),
+            ("Envases de madera", "150103"),
+            ("Envases metálicos", "150104"),
+            ("Envases de vidrio", "150107"),
+            ("Envases con residuos peligrosos", "150110"),
+            # Grupo 16 - Residuos no especificados
+            ("Baterías de plomo", "160601"),
+            ("Neumáticos fuera de uso", "160103"),
+            # Grupo 17 - Construcción y demolición
+            ("Mezclas de hormigón, ladrillos", "170107"),
+            ("Madera de construcción", "170201"),
+            ("Vidrio de construcción", "170202"),
+            ("Plástico de construcción", "170203"),
+            ("Hierro y acero de construcción", "170405"),
+            # Grupo 20 - Residuos municipales
+            ("Papel y cartón municipal", "200101"),
+            ("Vidrio municipal", "200102"),
+            ("Residuos biodegradables", "200201"),
+            ("Aceites y grasas comestibles", "200125"),
         ]
         
         estados = ['PENDIENTE', 'EN_TRANSITO', 'ENTREGADO', 'PROCESADO']
