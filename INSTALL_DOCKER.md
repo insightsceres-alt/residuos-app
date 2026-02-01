@@ -1,4 +1,4 @@
-# 🐳 Instalación de Docker Desktop
+ # 🐳 Instalación de Docker Desktop
 
 ## ✅ Checklist de Instalación
 

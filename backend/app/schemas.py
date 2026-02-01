@@ -8,6 +8,7 @@ from uuid import UUID
 
 class RegistroResiduoBase(BaseModel):
     tipologia: str = Field(..., max_length=100, description="Tipo de residuo")
+    codigo_ler: Optional[str] = Field(None, max_length=20, description="Código LER (Lista Europea de Residuos)")
     peso_kg: float = Field(..., gt=0, description="Peso en kilogramos")
     lugar_recogida: str = Field(..., max_length=255, description="Lugar de recogida")
     latitud: Optional[float] = None
@@ -25,10 +26,12 @@ class RegistroResiduoBase(BaseModel):
 
 class RegistroResiduoCreate(RegistroResiduoBase):
     usuario_creacion: Optional[str] = Field(None, max_length=100)
+    empresa_id: Optional[UUID] = None  # Se asigna automáticamente desde el token
 
 
 class RegistroResiduoUpdate(BaseModel):
     tipologia: Optional[str] = Field(None, max_length=100)
+    codigo_ler: Optional[str] = Field(None, max_length=20)
     peso_kg: Optional[float] = Field(None, gt=0)
     lugar_recogida: Optional[str] = Field(None, max_length=255)
     latitud: Optional[float] = None
@@ -54,11 +57,14 @@ class RegistroResiduoUpdate(BaseModel):
 
 class RegistroResiduoResponse(RegistroResiduoBase):
     id: UUID
+    empresa_id: Optional[UUID] = None
     fecha_registro: datetime
     estado: str
     numero_registro: Optional[str]
     documento_generado: bool
     documento_url: Optional[str]
+    enviado_esir: bool = False
+    fecha_envio_esir: Optional[datetime] = None
     usuario_creacion: Optional[str]
     fecha_creacion: datetime
     created_at: datetime
@@ -81,6 +87,13 @@ class TipologiaResiduoResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# ========== Schemas para Códigos LER ==========
+
+class CodigoLERResponse(BaseModel):
+    code: str
+    name: str
 
 
 # ========== Schemas para Transportistas ==========
@@ -178,3 +191,17 @@ class EstadisticasResponse(BaseModel):
     por_estado: dict
     por_tipologia: dict
     ultimos_7_dias: int
+
+
+class EvolutivoMensualItem(BaseModel):
+    mes: str  # "2025-01"
+    mes_nombre: str  # "Enero 2025"
+    tipologia: str
+    total_registros: int
+    peso_total_kg: float
+
+
+class EvolutivoMensualResponse(BaseModel):
+    meses: List[str]
+    series: dict  # {tipologia: [valores por mes]}
+    totales_por_mes: dict  # {mes: peso_total}
