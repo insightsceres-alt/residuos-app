@@ -6,17 +6,69 @@ import uuid
 from .database import Base
 
 
+# ============================================
+# MODELOS DE AUTENTICACIÓN
+# ============================================
+
+class Empresa(Base):
+    __tablename__ = "empresas"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nombre = Column(String(255), nullable=False)
+    cif = Column(String(20), unique=True, nullable=False)
+    direccion = Column(Text)
+    provincia = Column(String(100))
+    municipio = Column(String(100))
+    telefono = Column(String(20))
+    email = Column(String(100))
+    sector = Column(String(100))  # Ej: "Agroalimentario", "Industrial"
+    activo = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    usuarios = relationship("Usuario", back_populates="empresa")
+    registros = relationship("RegistroResiduo", back_populates="empresa")
+
+
+class Usuario(Base):
+    __tablename__ = "usuarios"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String(100), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    nombre = Column(String(100), nullable=False)
+    apellidos = Column(String(150))
+    empresa_id = Column(UUID(as_uuid=True), ForeignKey("empresas.id"), nullable=False)
+    rol = Column(String(50), default="operador")  # admin, gestor, operador
+    activo = Column(Boolean, default=True)
+    ultimo_login = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    empresa = relationship("Empresa", back_populates="usuarios")
+
+
+# ============================================
+# MODELO PRINCIPAL DE REGISTROS
+# ============================================
+
 class RegistroResiduo(Base):
     __tablename__ = "registros_residuos"
     
     # Identificador
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
+    # Empresa propietaria del registro
+    empresa_id = Column(UUID(as_uuid=True), ForeignKey("empresas.id"))
+    
     # Información temporal
     fecha_registro = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
     # Información del residuo
     tipologia = Column(String(100), nullable=False)
+    codigo_ler = Column(String(20))  # Código LER (Lista Europea de Residuos)
     peso_kg = Column(Float, nullable=False)
     
     # Ubicación
@@ -45,6 +97,10 @@ class RegistroResiduo(Base):
     documento_url = Column(Text)
     observaciones = Column(Text)
     
+    # E-SIR
+    enviado_esir = Column(Boolean, default=False)
+    fecha_envio_esir = Column(DateTime(timezone=True))
+    
     # Auditoría
     usuario_creacion = Column(String(100))
     fecha_creacion = Column(DateTime(timezone=True), server_default=func.now())
@@ -56,6 +112,7 @@ class RegistroResiduo(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relationships
+    empresa = relationship("Empresa", back_populates="registros")
     transportista = relationship("Transportista", back_populates="registros")
     vehiculo = relationship("Vehiculo", back_populates="registros")
     documentos = relationship("DocumentoGenerado", back_populates="registro", cascade="all, delete-orphan")

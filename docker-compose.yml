@@ -47,6 +47,7 @@ services:
       - "8002:8002"
     volumes:
       - ./backend/app:/app/app:ro
+      - ./codes.xlsx:/app/codes.xlsx:ro
     depends_on:
       postgres:
         condition: service_healthy

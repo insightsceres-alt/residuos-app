@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRegistros, deleteRegistro, updateRegistro, getEstados, getTipologias, getProvincias } from '../services/api';
+import { getRegistros, deleteRegistro, updateRegistro, getEstados, getGruposLER, getProvincias, exportarXMLeSIR, marcarEnviadoEsir } from '../services/api';
 import { format } from 'date-fns';
 
 function RegistrosList() {
@@ -17,7 +17,7 @@ function RegistrosList() {
   const [pagination, setPagination] = useState({});
   const [catalogos, setCatalogos] = useState({
     estados: [],
-    tipologias: [],
+    gruposLER: [],
     provincias: []
   });
   const [selectedRegistro, setSelectedRegistro] = useState(null);
@@ -32,14 +32,14 @@ function RegistrosList() {
 
   const loadCatalogos = async () => {
     try {
-      const [estados, tipologias, provincias] = await Promise.all([
+      const [estados, gruposLER, provincias] = await Promise.all([
         getEstados(),
-        getTipologias(),
+        getGruposLER(),
         getProvincias()
       ]);
       setCatalogos({
         estados: estados.data,
-        tipologias: tipologias.data,
+        gruposLER: gruposLER.data || [],
         provincias: provincias.data
       });
     } catch (err) {
@@ -91,6 +91,22 @@ function RegistrosList() {
     }
   };
 
+  const handleExportEsir = async (registro) => {
+    try {
+      // Generar y descargar el XML
+      exportarXMLeSIR(registro);
+      
+      // Si no estaba marcado como enviado, marcarlo
+      if (!registro.enviado_esir) {
+        await marcarEnviadoEsir(registro.id);
+        loadRegistros(); // Recargar para mostrar el check
+      }
+    } catch (err) {
+      console.error('Error al marcar como enviado:', err);
+      // El XML ya se descargó, solo falló el marcado
+    }
+  };
+
   const formatDate = (dateString) => {
     try {
       return format(new Date(dateString), 'dd/MM/yyyy HH:mm');
@@ -137,15 +153,18 @@ function RegistrosList() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Tipología</label>
+            <label className="form-label">Categoría LER</label>
             <select
               className="form-select"
               value={filters.tipologia}
               onChange={(e) => setFilters({ ...filters, tipologia: e.target.value, page: 1 })}
+              style={{ maxWidth: '300px' }}
             >
-              <option value="">Todas</option>
-              {catalogos.tipologias.map(tip => (
-                <option key={tip.codigo} value={tip.nombre}>{tip.nombre}</option>
+              <option value="">Todas las categorías</option>
+              {catalogos.gruposLER.map(grupo => (
+                <option key={grupo.code} value={grupo.code}>
+                  {grupo.code} - {grupo.name.length > 40 ? grupo.name.substring(0, 40) + '...' : grupo.name}
+                </option>
               ))}
             </select>
           </div>
@@ -195,10 +214,12 @@ function RegistrosList() {
               <tr>
                 <th>N° Registro</th>
                 <th>Fecha</th>
+                <th>Código LER</th>
                 <th>Tipología</th>
                 <th>Peso (kg)</th>
                 <th>Lugar Recogida</th>
                 <th>Provincia</th>
+                <th>E-SIR</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -208,10 +229,32 @@ function RegistrosList() {
                 <tr key={registro.id}>
                   <td>{registro.numero_registro}</td>
                   <td>{formatDate(registro.fecha_registro)}</td>
-                  <td>{registro.tipologia}</td>
+                  <td>
+                    <span style={{ 
+                      backgroundColor: '#e8f5e9', 
+                      padding: '2px 6px', 
+                      borderRadius: '4px',
+                      fontWeight: '600',
+                      color: '#2e7d32'
+                    }}>
+                      {registro.codigo_ler || '-'}
+                    </span>
+                  </td>
+                  <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={registro.tipologia}>
+                    {registro.tipologia}
+                  </td>
                   <td>{registro.peso_kg.toLocaleString()}</td>
                   <td>{registro.lugar_recogida}</td>
                   <td>{registro.provincia}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    {registro.enviado_esir ? (
+                      <span title={`Enviado: ${registro.fecha_envio_esir ? formatDate(registro.fecha_envio_esir) : ''}`} style={{ color: '#2e7d32', fontSize: '18px' }}>
+                        ✅
+                      </span>
+                    ) : (
+                      <span style={{ color: '#999', fontSize: '18px' }}>⬜</span>
+                    )}
+                  </td>
                   <td>
                     <select
                       className={`badge badge-${registro.estado.toLowerCase().replace('_', '-')}`}
@@ -231,6 +274,15 @@ function RegistrosList() {
                       onClick={() => setSelectedRegistro(registro)}
                     >
                       Ver
+                    </button>
+                    {' '}
+                    <button 
+                      className={registro.enviado_esir ? "btn btn-secondary" : "btn btn-success"}
+                      style={{ fontSize: '12px', padding: '4px 8px' }}
+                      onClick={() => handleExportEsir(registro)}
+                      title={registro.enviado_esir ? "Ya enviado - Descargar XML nuevamente" : "Exportar XML para E-SIR"}
+                    >
+                      {registro.enviado_esir ? '✅ E-SIR' : '📤 E-SIR'}
                     </button>
                     {' '}
                     <button 
@@ -278,6 +330,7 @@ function RegistrosList() {
             <div>
               <p><strong>Número:</strong> {selectedRegistro.numero_registro}</p>
               <p><strong>Fecha:</strong> {formatDate(selectedRegistro.fecha_registro)}</p>
+              <p><strong>Código LER:</strong> <span style={{ backgroundColor: '#e8f5e9', padding: '2px 8px', borderRadius: '4px', fontWeight: '600', color: '#2e7d32' }}>{selectedRegistro.codigo_ler || 'N/A'}</span></p>
               <p><strong>Tipología:</strong> {selectedRegistro.tipologia}</p>
               <p><strong>Peso:</strong> {selectedRegistro.peso_kg} kg</p>
               <p><strong>Lugar de Recogida:</strong> {selectedRegistro.lugar_recogida}</p>
@@ -287,11 +340,27 @@ function RegistrosList() {
               <p><strong>Vehículo:</strong> {selectedRegistro.vehiculo_matricula || 'N/A'}</p>
               <p><strong>Conductor:</strong> {selectedRegistro.conductor_nombre || 'N/A'}</p>
               <p><strong>Estado:</strong> <span className={`badge badge-${selectedRegistro.estado.toLowerCase().replace('_', '-')}`}>{selectedRegistro.estado}</span></p>
+              <p>
+                <strong>Enviado a E-SIR:</strong>{' '}
+                {selectedRegistro.enviado_esir ? (
+                  <span style={{ color: '#2e7d32' }}>
+                    ✅ Sí {selectedRegistro.fecha_envio_esir && `(${formatDate(selectedRegistro.fecha_envio_esir)})`}
+                  </span>
+                ) : (
+                  <span style={{ color: '#999' }}>❌ No</span>
+                )}
+              </p>
               {selectedRegistro.observaciones && (
                 <p><strong>Observaciones:</strong> {selectedRegistro.observaciones}</p>
               )}
             </div>
             <div className="modal-actions">
+              <button 
+                className={selectedRegistro.enviado_esir ? "btn btn-secondary" : "btn btn-success"}
+                onClick={() => handleExportEsir(selectedRegistro)}
+              >
+                {selectedRegistro.enviado_esir ? '✅ Descargar XML nuevamente' : '📤 Exportar XML E-SIR'}
+              </button>
               <button className="btn btn-secondary" onClick={() => setSelectedRegistro(null)}>
                 Cerrar
               </button>

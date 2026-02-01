@@ -10,6 +10,46 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- ============================================
+-- TABLA: empresas (para multitenancy)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS empresas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(255) NOT NULL,
+    cif VARCHAR(20) UNIQUE NOT NULL,
+    direccion TEXT,
+    provincia VARCHAR(100),
+    municipio VARCHAR(100),
+    telefono VARCHAR(20),
+    email VARCHAR(100),
+    sector VARCHAR(100),
+    activo BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- TABLA: usuarios (autenticación)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS usuarios (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    apellidos VARCHAR(150),
+    empresa_id UUID REFERENCES empresas(id),
+    rol VARCHAR(50) DEFAULT 'operador',
+    activo BOOLEAN DEFAULT TRUE,
+    ultimo_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);
+CREATE INDEX IF NOT EXISTS idx_usuarios_empresa ON usuarios(empresa_id);
+
+-- ============================================
 -- TABLA PRINCIPAL: registros_residuos
 -- ============================================
 
@@ -17,11 +57,15 @@ CREATE TABLE IF NOT EXISTS registros_residuos (
     -- Identificador único
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     
+    -- Empresa propietaria
+    empresa_id UUID REFERENCES empresas(id),
+    
     -- Información temporal
     fecha_registro TIMESTAMP NOT NULL DEFAULT NOW(),
     
     -- Información del residuo
     tipologia VARCHAR(100) NOT NULL,
+    codigo_ler VARCHAR(20),  -- Código LER (Lista Europea de Residuos)
     peso_kg DECIMAL(10,2) NOT NULL CHECK (peso_kg > 0),
     
     -- Ubicación de recogida
@@ -49,6 +93,10 @@ CREATE TABLE IF NOT EXISTS registros_residuos (
     documento_generado BOOLEAN DEFAULT FALSE,
     documento_url TEXT,
     observaciones TEXT,
+    
+    -- E-SIR
+    enviado_esir BOOLEAN DEFAULT FALSE,
+    fecha_envio_esir TIMESTAMP,
     
     -- Auditoría
     usuario_creacion VARCHAR(100),
