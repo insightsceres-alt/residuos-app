@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .database import engine, Base
-from .routes import registros, catalogos
+from .routes import registros, catalogos, auth
 
 settings = get_settings()
 
@@ -27,6 +27,7 @@ app.add_middleware(
 )
 
 # Incluir routers
+app.include_router(auth.router, prefix="/residuos/api")
 app.include_router(registros.router, prefix="/residuos/api")
 app.include_router(catalogos.router, prefix="/residuos/api")
 

@@ -8,7 +8,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/residuos/api': {
-        target: 'http://localhost:8002',
+        target: 'http://residuos-backend:8002',
         changeOrigin: true,
       }
     }

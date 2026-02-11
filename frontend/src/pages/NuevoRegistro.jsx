@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createRegistro, getTipologias, getTransportistas, getVehiculos, getProvincias } from '../services/api';
+import { createRegistro, getTipologias, getTransportistas, getVehiculos, getProvincias, getMunicipios, searchCodigosLER } from '../services/api';
 
 function NuevoRegistro() {
   const navigate = useNavigate();
@@ -11,11 +11,13 @@ function NuevoRegistro() {
     tipologias: [],
     transportistas: [],
     vehiculos: [],
-    provincias: []
+    provincias: [],
+    municipios: []
   });
   
   const [formData, setFormData] = useState({
     tipologia: '',
+    codigo_ler: '',
     peso_kg: '',
     lugar_recogida: '',
     latitud: '',
@@ -32,6 +34,13 @@ function NuevoRegistro() {
     usuario_creacion: 'Sistema'
   });
 
+  // Estado para autocompletado de código LER
+  const [lerSuggestions, setLerSuggestions] = useState([]);
+  const [showLerDropdown, setShowLerDropdown] = useState(false);
+  const [searchingLer, setSearchingLer] = useState(false);
+  const lerInputRef = useRef(null);
+  const lerDropdownRef = useRef(null);
+
   useEffect(() => {
     loadCatalogos();
   }, []);
@@ -41,6 +50,27 @@ function NuevoRegistro() {
       loadVehiculos(formData.transportista_id);
     }
   }, [formData.transportista_id]);
+
+  // Cargar municipios cuando cambia la provincia
+  useEffect(() => {
+    if (formData.provincia) {
+      loadMunicipios(formData.provincia);
+    } else {
+      setCatalogos(prev => ({ ...prev, municipios: [] }));
+    }
+  }, [formData.provincia]);
+
+  // Cerrar dropdown de LER cuando se hace clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (lerDropdownRef.current && !lerDropdownRef.current.contains(event.target) &&
+          lerInputRef.current && !lerInputRef.current.contains(event.target)) {
+        setShowLerDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadCatalogos = async () => {
     try {
@@ -72,12 +102,72 @@ function NuevoRegistro() {
     }
   };
 
+  const loadMunicipios = async (provincia) => {
+    try {
+      const response = await getMunicipios(provincia);
+      setCatalogos(prev => ({
+        ...prev,
+        municipios: response.data
+      }));
+    } catch (err) {
+      console.error('Error cargando municipios:', err);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    // Si cambia la provincia, limpiar el municipio
+    if (name === 'provincia') {
+      setFormData({
+        ...formData,
+        provincia: value,
+        municipio: ''
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
+  };
+
+  // Búsqueda de códigos LER con debounce
+  const handleTipologiaChange = async (e) => {
+    const value = e.target.value;
     setFormData({
       ...formData,
-      [name]: value
+      tipologia: value,
+      codigo_ler: '' // Limpiar código LER cuando cambia la descripción
     });
+
+    if (value.length >= 2) {
+      setSearchingLer(true);
+      try {
+        const response = await searchCodigosLER(value);
+        setLerSuggestions(response.data);
+        setShowLerDropdown(response.data.length > 0);
+      } catch (err) {
+        console.error('Error buscando códigos LER:', err);
+        setLerSuggestions([]);
+      } finally {
+        setSearchingLer(false);
+      }
+    } else {
+      setLerSuggestions([]);
+      setShowLerDropdown(false);
+    }
+  };
+
+  // Seleccionar una sugerencia de código LER
+  const handleSelectLerSuggestion = (suggestion) => {
+    setFormData({
+      ...formData,
+      tipologia: suggestion.name,
+      codigo_ler: suggestion.code
+    });
+    setShowLerDropdown(false);
+    setLerSuggestions([]);
   };
 
   const handleSubmit = async (e) => {
@@ -138,24 +228,79 @@ function NuevoRegistro() {
           <h3 className="card-title">Información del Residuo</h3>
           
           <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Tipología *</label>
-              <select
+            <div className="form-group" style={{ flex: 2, position: 'relative' }}>
+              <label className="form-label">Descripción del Residuo (LER) *</label>
+              <input
+                ref={lerInputRef}
+                type="text"
                 name="tipologia"
-                className="form-select"
+                className="form-input"
                 value={formData.tipologia}
-                onChange={handleChange}
+                onChange={handleTipologiaChange}
+                onFocus={() => lerSuggestions.length > 0 && setShowLerDropdown(true)}
                 required
-              >
-                <option value="">Seleccionar...</option>
-                {catalogos.tipologias.map(tip => (
-                  <option key={tip.codigo} value={tip.nombre}>
-                    {tip.nombre} {tip.peligroso && '⚠️'}
-                  </option>
-                ))}
-              </select>
+                placeholder="Escribe para buscar en el catálogo LER..."
+                autoComplete="off"
+              />
+              {searchingLer && (
+                <span style={{ position: 'absolute', right: '10px', top: '38px', color: '#666' }}>
+                  🔍
+                </span>
+              )}
+              {showLerDropdown && lerSuggestions.length > 0 && (
+                <div
+                  ref={lerDropdownRef}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    maxHeight: '250px',
+                    overflowY: 'auto',
+                    backgroundColor: '#fff',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                    zIndex: 1000
+                  }}
+                >
+                  {lerSuggestions.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleSelectLerSuggestion(suggestion)}
+                      style={{
+                        padding: '10px 12px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #eee',
+                        fontSize: '14px'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#fff'}
+                    >
+                      <strong style={{ color: '#2e7d32' }}>{suggestion.code}</strong>
+                      <span style={{ marginLeft: '10px', color: '#333' }}>{suggestion.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
+            <div className="form-group">
+              <label className="form-label">Código LER</label>
+              <input
+                type="text"
+                name="codigo_ler"
+                className="form-input"
+                value={formData.codigo_ler}
+                onChange={handleChange}
+                placeholder="Se auto-rellena"
+                style={{ backgroundColor: '#f9f9f9' }}
+                readOnly
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
             <div className="form-group">
               <label className="form-label">Peso (kg) *</label>
               <input
@@ -207,14 +352,18 @@ function NuevoRegistro() {
 
             <div className="form-group">
               <label className="form-label">Municipio</label>
-              <input
-                type="text"
+              <select
                 name="municipio"
-                className="form-input"
+                className="form-select"
                 value={formData.municipio}
                 onChange={handleChange}
-                placeholder="Madrid"
-              />
+                disabled={!formData.provincia}
+              >
+                <option value="">{formData.provincia ? 'Seleccionar municipio...' : 'Selecciona primero una provincia'}</option>
+                {catalogos.municipios.map(mun => (
+                  <option key={mun} value={mun}>{mun}</option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group">
